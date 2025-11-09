@@ -1,96 +1,15 @@
 import sys
-import types
 from pathlib import Path
 import unittest
 
-# Provide minimal PyQt5 shims so the server module can be imported without the
-# actual GUI dependencies being present in the test environment.
-if "PyQt5" not in sys.modules:  # pragma: no cover - executed during import
-    pyqt5 = types.ModuleType("PyQt5")
-    sys.modules["PyQt5"] = pyqt5
+TEST_DIR = Path(__file__).resolve().parent
+if str(TEST_DIR) not in sys.path:
+    sys.path.insert(0, str(TEST_DIR))
 
-    class _Signal:
-        def __init__(self) -> None:
-            self._slots: list = []
+from qt5_shims import add_dist_packages_to_path, ensure_pyqt5
 
-        def connect(self, slot) -> None:  # noqa: D401 - match PyQt interface
-            self._slots.append(slot)
-
-        def emit(self, *args, **kwargs) -> None:
-            for slot in list(self._slots):
-                slot(*args, **kwargs)
-
-    class _QObject:
-        def __init__(self, *_, **__):
-            pass
-
-    qtcore = types.ModuleType("PyQt5.QtCore")
-    qtcore.pyqtSignal = lambda *_, **__: _Signal()  # type: ignore[assignment]
-    qtcore.Qt = type("Qt", (), {})
-    qtcore.QObject = _QObject
-    qtcore.QTimer = type("QTimer", (), {})
-    sys.modules["PyQt5.QtCore"] = qtcore
-    pyqt5.QtCore = qtcore
-
-    def _dummy_class(name: str):
-        return type(name, (), {"__init__": lambda self, *_, **__: None})
-
-    qtgui = types.ModuleType("PyQt5.QtGui")
-    for cls_name in ("QIcon", "QImage", "QCursor", "QPixmap"):
-        setattr(qtgui, cls_name, _dummy_class(cls_name))
-    sys.modules["PyQt5.QtGui"] = qtgui
-    pyqt5.QtGui = qtgui
-
-    qtwidgets = types.ModuleType("PyQt5.QtWidgets")
-    for cls_name in (
-        "QMenu",
-        "QAction",
-        "QApplication",
-        "QDialog",
-        "QWidget",
-        "QLabel",
-        "QPushButton",
-        "QGridLayout",
-    ):
-        setattr(qtwidgets, cls_name, _dummy_class(cls_name))
-
-    class _SystemTrayIcon(_dummy_class("QSystemTrayIcon")):
-        ActivationReason = type("ActivationReason", (), {})
-
-    qtwidgets.QSystemTrayIcon = _SystemTrayIcon
-    sys.modules["PyQt5.QtWidgets"] = qtwidgets
-    pyqt5.QtWidgets = qtwidgets
-
-    class _DummySocket:
-        def __init__(self, *_, **__):
-            self._ready_read = _Signal()
-            self._disconnected = _Signal()
-
-        def setParent(self, *_):
-            pass
-
-        @property
-        def readyRead(self):  # noqa: D401 - mimic PyQt signal
-            return self._ready_read
-
-        @property
-        def disconnected(self):  # noqa: D401 - mimic PyQt signal
-            return self._disconnected
-
-        def readAll(self):
-            return types.SimpleNamespace(data=lambda: b"")
-
-    qtnetwork = types.ModuleType("PyQt5.QtNetwork")
-    qtnetwork.QLocalSocket = _DummySocket
-    qtnetwork.QLocalServer = _dummy_class("QLocalServer")
-    sys.modules["PyQt5.QtNetwork"] = qtnetwork
-    pyqt5.QtNetwork = qtnetwork
-
-sys.path.insert(
-    0,
-    str(Path(__file__).resolve().parents[1] / "usr" / "lib" / "python3" / "dist-packages"),
-)
-
+ensure_pyqt5()
+add_dist_packages_to_path()
 from sdwdate_gui.sdwdate_gui_server import SdwdateGuiClient
 
 

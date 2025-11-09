@@ -167,23 +167,23 @@ def parse_config_file(config_file: str) -> None:
     Parses a single config file.
     """
 
-    comment_re: Pattern[str] = re.compile(".*#")
+    comment_re: Pattern[str] = re.compile(r"^\s*#")
     with open(config_file, "r", encoding="utf-8") as f:
         for line in f:
             if comment_re.match(line):
                 continue
-            line = line.strip()
+            line = line.split("#", maxsplit=1)[0].strip()
             if line == "":
                 continue
-            if not "=" in line:
+            if "=" not in line:
                 logging.error(
                     "Invalid line detected in file '%s'",
                     config_file,
                 )
                 sys.exit(1)
             line_parts: list[str] = line.split("=", maxsplit=1)
-            config_key: str = line_parts[0]
-            config_val: str = line_parts[1]
+            config_key: str = line_parts[0].strip()
+            config_val: str = line_parts[1].strip()
             match config_key:
                 case "disable":
                     if config_val == "true":
