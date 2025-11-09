@@ -2,6 +2,7 @@ import asyncio
 import sys
 import types
 import unittest
+from unittest import mock
 
 # Provide minimal pyinotify shims so the client module can be imported without
 # the actual dependency being present in the test environment.
@@ -81,6 +82,39 @@ class FragmentedClientMessageParsingTests(unittest.TestCase):
 
         self.assertEqual(client.GlobalData.sock_buf, b"")
         self.assertEqual(self.recorded_calls, ["open_sdwdate_log"])
+
+
+class TorStatusReportingTests(unittest.TestCase):
+    """Tests covering the client's Tor status reporting logic."""
+
+    def setUp(self) -> None:
+        self._orig_anon_installed = client.GlobalData.anon_connection_wizard_installed
+        self._orig_tor_status = getattr(client, "tor_status", None)
+        self._orig_set_tor_status = client.set_tor_status
+        self.reported_statuses: list[str] = []
+
+        async def record_status(status: str) -> None:
+            self.reported_statuses.append(status)
+
+        client.set_tor_status = record_status
+
+    def tearDown(self) -> None:
+        client.GlobalData.anon_connection_wizard_installed = self._orig_anon_installed
+        if self._orig_tor_status is None:
+            if hasattr(client, "tor_status"):
+                delattr(client, "tor_status")
+        else:
+            client.tor_status = self._orig_tor_status
+        client.set_tor_status = self._orig_set_tor_status
+
+    def test_disabled_service_running_reports_disabled_running(self) -> None:
+        client.GlobalData.anon_connection_wizard_installed = True
+        client.tor_status = types.SimpleNamespace(tor_status=lambda: "tor_disabled")
+
+        with mock.patch.object(client.os.path, "exists", return_value=True):
+            asyncio.run(client.tor_status_changed())
+
+        self.assertEqual(self.reported_statuses, ["disabled_running"])
 
 
 if __name__ == "__main__":  # pragma: no cover
