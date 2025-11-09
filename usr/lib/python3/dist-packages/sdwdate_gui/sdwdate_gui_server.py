@@ -259,11 +259,13 @@ class SdwdateGuiClient(QObject):
             msg_len: int = int.from_bytes(
                 self.__sock_buf[:2], byteorder="big", signed=False
             )
+
+            if len(self.__sock_buf) < msg_len + 2:
+                break
+
             self.__sock_buf = self.__sock_buf[2:]
 
             if msg_len == 0:
-                continue
-            if msg_len > len(self.__sock_buf):
                 continue
 
             msg_buf: bytes = self.__sock_buf[:msg_len]
