@@ -245,7 +245,7 @@ async def try_parse_commands() -> None:
             GlobalData.sock_buf[:2], byteorder="big", signed=False
         )
 
-        if msg_len > len(GlobalData.sock_buf):
+        if len(GlobalData.sock_buf) < msg_len + 2:
             break
         GlobalData.sock_buf = GlobalData.sock_buf[2:]
         if msg_len == 0:
