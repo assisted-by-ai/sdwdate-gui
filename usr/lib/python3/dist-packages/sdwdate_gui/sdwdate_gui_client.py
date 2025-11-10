@@ -213,6 +213,9 @@ async def try_parse_commands() -> None:
                     await kick_server()
                     return
                 suppress_client_reconnect()
+            case _:
+                await kick_server()
+                return
 
 
 async def handle_incoming_data() -> bool:
@@ -350,8 +353,19 @@ async def sdwdate_status_changed() -> None:
         logging.error("Unexpected error", exc_info=e)
         return
 
-    status_str: str = status_dict["icon"]
-    message_str: str = status_dict["message"]
+    try:
+        status_str = status_dict["icon"]
+        message_str = status_dict["message"]
+    except KeyError as exc:
+        logging.warning(
+            "Missing key '%s' in sdwdate status file!",
+            exc.args[0] if exc.args else "<unknown>",
+        )
+        return
+
+    if not isinstance(status_str, str) or not isinstance(message_str, str):
+        logging.warning("Invalid data found in sdwdate status file!")
+        return
     if status_str in ("success", "busy", "error"):
         await set_sdwdate_status(status_str, message_str)
     else:

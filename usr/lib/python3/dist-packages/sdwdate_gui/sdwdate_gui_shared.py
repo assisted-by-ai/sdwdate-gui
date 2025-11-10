@@ -30,11 +30,12 @@ class ConfigData:
         "run_server_in_qubes": "bool",
         "gateway": "str",
     }
-    conf_dict: dict[str, Any] = {
+    conf_defaults: dict[str, Any] = {
         "disable": False,
         "run_server_in_qubes": False,
         "gateway": "sys-whonix",
     }
+    conf_dict: dict[str, Any] = conf_defaults.copy()
 
 
 def check_bytes_printable(buf: bytes) -> bool:
@@ -83,6 +84,9 @@ def parse_config_files() -> None:
     """
 
     config_file_list: list[Path] = []
+
+    ## Reset configuration to defaults before applying overrides from files.
+    ConfigData.conf_dict = ConfigData.conf_defaults.copy()
 
     for dir_item in ConfigData.conf_dir_list:
         config_file_sub_list: list[Path] = []
