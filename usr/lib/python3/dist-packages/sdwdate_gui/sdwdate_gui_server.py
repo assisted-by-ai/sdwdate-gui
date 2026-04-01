@@ -647,7 +647,10 @@ class SdwdateTrayIcon(QSystemTrayIcon):
         self.setToolTip("Time Synchronization Monitor \nRight-click for menu.")
 
         self.menu: QMenu = QMenu()
+        self.menu_regen_pending: bool = False
         self.regen_menu()
+        self.menu.aboutToShow.connect(self.regen_menu)
+        self.menu.aboutToHide.connect(self.handle_menu_hidden)
         self.setContextMenu(self.menu)
         self.activated.connect(self.show_menu)
 
@@ -744,11 +747,24 @@ to connect to or configure the Tor network."""
         Regenerates the context menu for the tray icon.
         """
 
+        if self.menu.isVisible():
+            ## Avoid mutating menu actions while the menu popup is on screen.
+            ## Queue a refresh to run when the popup closes.
+            self.menu_regen_pending = True
+            return
+
+        self.menu_regen_pending = False
         self.menu.clear()
 
+        if len(self.client_list) == 0:
+            no_clients_action = QAction(
+                "Waiting for sdwdate-gui client connection...",
+                self.menu,
+            )
+            no_clients_action.setEnabled(False)
+            self.menu.addAction(no_clients_action)
         for client in self.client_list:
-            if client.client_name is None:
-                continue
+            client_menu_name: str = client.client_name_or_unknown()
 
             ## Client icon is the client's sdwdate status icon, unless the
             ## client is Tor-enabled and Tor is stopped or disabled.
@@ -766,14 +782,20 @@ to connect to or configure the Tor network."""
                     self.sdwdate_icon_list[client.sdwdate_status.value],
                 )
             else:
-                continue
+                ## If the client has connected and provided its name but not
+                ## yet sent status updates, still show the full menu. This
+                ## avoids intermittently showing only "Exit" while waiting for
+                ## status updates.
+                client_icon = QIcon(
+                    self.sdwdate_icon_list[SdwdateStatus.BUSY.value],
+                )
 
             ## Each client gets its own submenu, unless there's only one
             ## client.
             if len(self.client_list) > 1:
                 action_menu: QMenu | None = self.menu.addMenu(
                     client_icon,
-                    client.client_name,
+                    client_menu_name,
                 )
             else:
                 action_menu = self.menu
@@ -860,7 +882,8 @@ to connect to or configure the Tor network."""
             action.triggered.connect(functools.partial(client.stop_sdwdate))
             action_menu.addAction(action)
 
-        self.menu.addSeparator()
+        if len(self.client_list) > 0:
+            self.menu.addSeparator()
 
         ## Add a button to quit the sdwdate GUI server underneath all the
         ## client entries
@@ -871,6 +894,14 @@ to connect to or configure the Tor network."""
         )
         action.triggered.connect(sys.exit)
         self.menu.addAction(action)
+
+    def handle_menu_hidden(self) -> None:
+        """
+        Runs a deferred menu regeneration after the popup closes.
+        """
+
+        if self.menu_regen_pending:
+            self.regen_menu()
 
     def set_tray_icon(self) -> None:
         """
@@ -985,6 +1016,8 @@ to connect to or configure the Tor network."""
         """
 
         self.client_list.append(client)
+        self.regen_menu()
+        self.set_tray_icon()
         client.clientNameChanged.connect(
             functools.partial(
                 self.handle_client_name_change,
