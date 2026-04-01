@@ -766,7 +766,9 @@ to connect to or configure the Tor network."""
                     self.sdwdate_icon_list[client.sdwdate_status.value],
                 )
             else:
-                continue
+                client_icon = QIcon(
+                    self.sdwdate_icon_list[SdwdateStatus.BUSY.value],
+                )
 
             ## Each client gets its own submenu, unless there's only one
             ## client.
