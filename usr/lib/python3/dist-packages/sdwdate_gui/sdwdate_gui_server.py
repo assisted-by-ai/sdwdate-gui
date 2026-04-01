@@ -756,17 +756,25 @@ to connect to or configure the Tor network."""
             ## client.tor_status will be TorStatus.ABSENT if the client is not
             ## Tor-enabled, so we don't have to explicitly check if the client
             ## is Tor-enabled or not.
+            ##
+            ## If both the Tor and sdwdate statuses are still UNKNOWN (i.e. the
+            ## client has connected and sent its name but the first status
+            ## update hasn't arrived yet), fall back to the BUSY icon so the
+            ## client still appears in the menu instead of being skipped.
             client_icon: QIcon
             if client.tor_status in (TorStatus.STOPPED, TorStatus.DISABLED):
                 client_icon = QIcon(
                     self.tor_icon_list[client.tor_status.value],
                 )
-            elif client.sdwdate_status != SdwdateStatus.UNKNOWN:
-                client_icon = QIcon(
-                    self.sdwdate_icon_list[client.sdwdate_status.value],
-                )
             else:
-                continue
+                icon_status = (
+                    client.sdwdate_status
+                    if client.sdwdate_status != SdwdateStatus.UNKNOWN
+                    else SdwdateStatus.BUSY
+                )
+                client_icon = QIcon(
+                    self.sdwdate_icon_list[icon_status.value],
+                )
 
             ## Each client gets its own submenu, unless there's only one
             ## client.
